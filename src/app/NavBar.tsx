@@ -40,7 +40,10 @@ export default function NavBar() {
       {/* Right — Share results on results page, empty elsewhere */}
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         {isResults && (
-          <span style={{ fontSize: "13px", fontWeight: 500, color: "#AAAAAA", cursor: "pointer" }}>
+          <span
+            onClick={() => window.dispatchEvent(new CustomEvent("pep:share"))}
+            style={{ fontSize: "13px", fontWeight: 500, color: "#AAAAAA", cursor: "pointer" }}
+          >
             Share results
           </span>
         )}
