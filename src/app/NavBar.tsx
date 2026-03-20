@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 export default function NavBar() {
   const pathname = usePathname();
   const isQuiz = pathname?.startsWith("/quiz");
+  const isResults = pathname?.startsWith("/results");
 
   return (
     <nav style={{
@@ -14,9 +15,9 @@ export default function NavBar() {
       padding: "16px 20px",
       borderBottom: "1px solid #EEEEEE",
     }}>
-      {/* Left — Directory link (hidden on quiz) */}
+      {/* Left — Directory link (hidden on quiz and results) */}
       <div>
-        {!isQuiz && (
+        {!isQuiz && !isResults && (
           <a href="/peptides" style={{ fontSize: "13px", fontWeight: 500, color: "#AAAAAA", textDecoration: "none" }}>
             Directory
           </a>
@@ -36,8 +37,14 @@ export default function NavBar() {
         </span>
       </a>
 
-      {/* Right — empty */}
-      <div />
+      {/* Right — Share results on results page, empty elsewhere */}
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        {isResults && (
+          <span style={{ fontSize: "13px", fontWeight: 500, color: "#AAAAAA", cursor: "pointer" }}>
+            Share results
+          </span>
+        )}
+      </div>
     </nav>
   );
 }

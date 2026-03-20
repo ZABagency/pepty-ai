@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { Syne } from "next/font/google";
 import peptides from "@/data/peptides.json";
 import vendors from "@/data/vendors.json";
 import { buildAffiliateUrl } from "@/lib/affiliate";
+
+const syne = Syne({ subsets: ["latin"], weight: ["800"] });
 
 const navy = "#1A1A2E";
 const dark = "#111111";
@@ -74,13 +77,12 @@ const goalLabel: Record<string, string> = {
 function getVendorsForPeptide(peptideId: string, budget: string, isBeginnerCard: boolean): Vendor[] {
   const matching = vendors.filter((v) => v.peptides.includes(peptideId));
 
-  // Vendor priority by budget
   const tierOrder =
     budget === "low" || isBeginnerCard
       ? ["biotech-peptides", "peptide-sciences", "limitless-life"]
       : budget === "medium"
       ? ["peptide-sciences", "biotech-peptides", "limitless-life"]
-      : ["limitless-life", "peptide-sciences", "biotech-peptides"]; // high / unlimited
+      : ["limitless-life", "peptide-sciences", "biotech-peptides"];
 
   matching.sort((a, b) => {
     const ai = tierOrder.indexOf(a.id);
@@ -88,7 +90,6 @@ function getVendorsForPeptide(peptideId: string, budget: string, isBeginnerCard:
     return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
   });
 
-  // Budget / beginner: 1 vendor; otherwise up to 2
   const limit = budget === "low" || isBeginnerCard ? 1 : 2;
   return matching.slice(0, limit);
 }
@@ -100,7 +101,6 @@ function getRecommendations(
   injectionPref: string,
   budget: string
 ): { recs: Peptide[]; injectionFallback: boolean } {
-  // Score every peptide across selected goals (position-weighted so order matters)
   const scores: Record<string, number> = {};
   for (const goal of goals) {
     const list = goalMap[goal] ?? [];
@@ -113,12 +113,10 @@ function getRecommendations(
     .sort((a, b) => b[1] - a[1])
     .map(([id]) => id);
 
-  // Q4 — injection hard gate
   let injectionFallback = false;
   if (injectionPref === "no") {
     const safe = candidates.filter((id) => oralNasalSafe.has(id));
     if (safe.length === 0) {
-      // No oral/nasal match for their goals — show best-fit with fallback note
       injectionFallback = true;
       candidates = candidates.slice(0, 1);
     } else {
@@ -126,12 +124,10 @@ function getRecommendations(
     }
   }
 
-  // Q3 — experience gate
   const experienceMax =
     experience === "beginner" ? 1 :
     experience === "basic" ? 2 : 3;
 
-  // Q5 — budget gate
   const budgetMax =
     budget === "low" ? 1 :
     budget === "medium" ? 2 : experienceMax;
@@ -158,8 +154,14 @@ function PeptideCard({
   const isMinimal = displayStyle === "minimal";
   const showScience = displayStyle === "science";
   const showSocial = displayStyle === "social";
-  // Only show injection reassurance when nervous AND this specific peptide requires injection
   const showInjectionNote = injectionPref === "nervous" && peptide.method === "injection";
+
+  // Zero-padded card number pill: 01, 02, 03
+  const cardNum = String(index + 1).padStart(2, "0");
+
+  const labelStyle = {
+    fontSize: "12px", fontWeight: 600, color: muted, marginBottom: "4px",
+  } as const;
 
   return (
     <div style={{
@@ -168,15 +170,16 @@ function PeptideCard({
     }}>
       {/* Header */}
       <div style={{ padding: "14px 16px 12px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-          <div style={{ fontSize: "11px", fontWeight: 600, color: muted, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>
-            Recommendation #{index + 1}
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+          {/* Navy pill number badge */}
+          <span style={{
+            fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "100px",
+            background: navy, color: "#fff", letterSpacing: "0.04em",
+          }}>{cardNum}</span>
           {isBeginnerCard && (
             <span style={{
               fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "100px",
-              background: "#F0FDF4", color: "#166534",
-              letterSpacing: "0.02em", textTransform: "uppercase" as const,
+              background: "#F0FDF4", color: "#166534", letterSpacing: "0.02em",
             }}>Start here</span>
           )}
         </div>
@@ -195,66 +198,55 @@ function PeptideCard({
 
       {/* Q4 injection fallback note */}
       {injectionFallback && (
-        <>
-          <div style={{ height: "1px", background: "#F0F0F0" }} />
-          <div style={{ padding: "10px 16px", background: "#FFFBEB" }}>
+        <div style={{ padding: "10px 16px", paddingTop: 0 }}>
+          <div style={{ background: "#FFF8F0", borderRadius: "8px", padding: "10px 12px" }}>
             <p style={{ fontSize: "12px", color: "#92400E", margin: 0, lineHeight: 1.5 }}>
               This peptide works best via injection but oral options exist — ask your clinician about oral BPC-157 or nasal alternatives.
             </p>
           </div>
-        </>
+        </div>
       )}
 
-      {/* Q4 nervous reassurance — shown per card when peptide requires injection */}
+      {/* Q4 nervous reassurance */}
       {showInjectionNote && (
-        <>
-          <div style={{ height: "1px", background: "#F0F0F0" }} />
-          <div style={{ padding: "10px 16px", background: "#F0F9FF" }}>
+        <div style={{ padding: "10px 16px", paddingTop: 0 }}>
+          <div style={{ background: "#F0F9FF", borderRadius: "8px", padding: "10px 12px" }}>
             <p style={{ fontSize: "12px", color: "#0369A1", margin: 0, lineHeight: 1.5 }}>
               Subcutaneous injection is similar to what diabetics do daily — most people describe it as barely noticeable.
             </p>
           </div>
-        </>
+        </div>
       )}
 
       {/* Q6 science: how it works */}
       {showScience && (
-        <>
-          <div style={{ height: "1px", background: "#F0F0F0" }} />
-          <div style={{ padding: "12px 16px" }}>
-            <div style={{ fontSize: "11px", fontWeight: 600, color: muted, textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: "6px" }}>How it works</div>
-            <p style={{ fontSize: "13px", color: "#444", lineHeight: 1.6, margin: 0 }}>{peptide.howItWorks}</p>
-          </div>
-        </>
+        <div style={{ padding: "0 16px 14px" }}>
+          <div style={labelStyle}>How it works</div>
+          <p style={{ fontSize: "13px", color: "#444", lineHeight: 1.6, margin: 0 }}>{peptide.howItWorks}</p>
+        </div>
       )}
 
       {/* Q6 social: community proof */}
       {showSocial && socialProof[peptide.id] && (
-        <>
-          <div style={{ height: "1px", background: "#F0F0F0" }} />
-          <div style={{ padding: "10px 16px", background: "#FAFAFA" }}>
-            <div style={{ fontSize: "11px", fontWeight: 600, color: muted, textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: "4px" }}>Community</div>
-            <p style={{ fontSize: "13px", color: "#444", lineHeight: 1.5, margin: 0, fontStyle: "italic" }}>&ldquo;{socialProof[peptide.id]}&rdquo;</p>
-          </div>
-        </>
+        <div style={{ padding: "0 16px 14px" }}>
+          <div style={labelStyle}>Community</div>
+          <p style={{ fontSize: "13px", color: "#444", lineHeight: 1.5, margin: 0, fontStyle: "italic" }}>&ldquo;{socialProof[peptide.id]}&rdquo;</p>
+        </div>
       )}
 
-      <div style={{ height: "1px", background: "#F0F0F0" }} />
-
       {/* Dosing row */}
-      <div style={{ padding: "10px 16px", display: "flex", gap: "16px", flexWrap: "wrap" as const }}>
+      <div style={{ padding: "0 16px 14px", display: "flex", gap: "20px", flexWrap: "wrap" as const }}>
         <div>
-          <div style={{ fontSize: "11px", color: muted, fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: "2px" }}>Dosing</div>
-          <div style={{ fontSize: "13px", color: dark, fontFamily: "monospace" }}>{peptide.dosing.split(",")[0]}</div>
+          <div style={labelStyle}>Dosing</div>
+          <div style={{ fontSize: "13px", color: dark }}>{peptide.dosing.split(",")[0]}</div>
         </div>
         <div>
-          <div style={{ fontSize: "11px", color: muted, fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: "2px" }}>Method</div>
+          <div style={labelStyle}>Method</div>
           <div style={{ fontSize: "13px", color: dark, textTransform: "capitalize" as const }}>{peptide.method}</div>
         </div>
-        {/* Q5 budget display: show cost estimate for low and unlimited tiers */}
         {showCost && monthlyEstimate[peptide.id] && (
           <div>
-            <div style={{ fontSize: "11px", color: muted, fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: "2px" }}>Est. cost</div>
+            <div style={labelStyle}>Est. cost</div>
             <div style={{ fontSize: "13px", color: dark }}>{monthlyEstimate[peptide.id]}</div>
           </div>
         )}
@@ -262,34 +254,31 @@ function PeptideCard({
 
       {/* Vendor row */}
       {peptideVendors.length > 0 && (
-        <>
-          <div style={{ height: "1px", background: "#F0F0F0" }} />
-          <div style={{ padding: "10px 16px", display: "flex", flexDirection: "column" as const, gap: "8px" }}>
-            <div style={{ fontSize: "11px", fontWeight: 600, color: muted, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Best Sources</div>
-            {peptideVendors.map((v) => (
-              <div key={v.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <div style={{ fontSize: "14px", fontWeight: 600, color: dark }}>{v.name}</div>
-                  {v.badge && (
-                    <span style={{
-                      fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "100px",
-                      background: v.badge === "Best Value" ? "#ECFDF5" : "#EFF6FF",
-                      color: v.badge === "Best Value" ? "#065F46" : "#1E40AF",
-                      letterSpacing: "0.02em", textTransform: "uppercase" as const,
-                    }}>{v.badge}</span>
-                  )}
-                </div>
-                <a
-                  href={buildAffiliateUrl(v.affiliateBase, v.utmSource, v.utmMedium, peptide.id)}
-                  target="_blank" rel="noopener noreferrer sponsored"
-                  style={{ background: navy, color: "#fff", fontSize: "12px", fontWeight: 700, padding: "8px 14px", borderRadius: "8px", textDecoration: "none", whiteSpace: "nowrap" as const, flexShrink: 0 }}
-                >
-                  Best Source →
-                </a>
+        <div style={{ padding: "12px 16px", borderTop: `1px solid ${border}`, display: "flex", flexDirection: "column" as const, gap: "10px" }}>
+          <div style={labelStyle}>Best sources</div>
+          {peptideVendors.map((v) => (
+            <div key={v.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+                <div style={{ fontSize: "14px", fontWeight: 600, color: dark }}>{v.name}</div>
+                {v.badge && (
+                  <span style={{
+                    fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "100px",
+                    background: v.badge === "Best Value" ? "#4CAF50" : navy,
+                    color: "#fff",
+                    letterSpacing: "0.02em",
+                  }}>{v.badge}</span>
+                )}
               </div>
-            ))}
-          </div>
-        </>
+              <a
+                href={buildAffiliateUrl(v.affiliateBase, v.utmSource, v.utmMedium, peptide.id)}
+                target="_blank" rel="noopener noreferrer sponsored"
+                style={{ background: navy, color: "#fff", fontSize: "12px", fontWeight: 700, padding: "8px 14px", borderRadius: "8px", textDecoration: "none", whiteSpace: "nowrap" as const, flexShrink: 0 }}
+              >
+                Best Source →
+              </a>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -318,50 +307,41 @@ function GettingStarted({ recs }: { recs: Peptide[] }) {
 
 // ── Results page ──────────────────────────────────────────────────────────────
 function ResultsContent({ params }: { params: Record<string, string> }) {
-  const goals        = (params.goals    ?? "recovery").split(",").filter(Boolean);
-  const experience   = params.experience ?? "basic";
-  const injectionPref = params.injection ?? "fine";
-  const budget       = params.budget    ?? "medium";
-  const displayStyle = params.style     ?? "minimal";
-  const topConcern   = (params.concern  ?? "").split(",")[0];
+  const goals         = (params.goals    ?? "recovery").split(",").filter(Boolean);
+  const experience    = params.experience ?? "basic";
+  const injectionPref = params.injection  ?? "fine";
+  const budget        = params.budget     ?? "medium";
+  const displayStyle  = params.style      ?? "minimal";
+  const topConcern    = (params.concern   ?? "").split(",")[0];
 
   const isBeginnerCard = experience === "beginner";
-  // Show monthly cost estimate for budget-conscious (low) and premium (unlimited) tiers
   const showCost = budget === "low" || budget === "unlimited";
 
   const { recs, injectionFallback } = getRecommendations(goals, experience, injectionPref, budget);
-  const goalSummary = goals.map((g) => goalLabel[g] ?? g).join(" · ");
 
   return (
     <div style={{ padding: "24px 20px 48px" }}>
       {/* Header */}
       <div style={{ marginBottom: "20px" }}>
-        <p style={{ fontSize: "12px", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: muted, margin: "0 0 4px" }}>
-          Your protocol
+        <p style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: muted, margin: "0 0 6px" }}>
+          Your Protocol
         </p>
-        <h1 style={{ fontSize: "26px", fontWeight: 800, color: dark, margin: "0 0 4px", letterSpacing: "-0.01em", lineHeight: 1.2 }}>
-          {goalSummary}
+        <h1 className={syne.className} style={{ fontSize: "30px", fontWeight: 800, color: dark, margin: "0 0 6px", letterSpacing: "-0.02em", lineHeight: 1.15 }}>
+          Your Protocol is Ready.
         </h1>
         <p style={{ fontSize: "14px", color: muted, margin: 0 }}>
-          {recs.length} peptide{recs.length !== 1 ? "s" : ""} matched to your answers.
+          Personalized to your goals.
         </p>
       </div>
 
-      {/* Q2 concern reassurance banner */}
+      {/* Q2 concern reassurance — subtle, no border */}
       {concernReassurance[topConcern] && (
-        <div style={{ background: "#F0F4FF", border: "1px solid #D0D9F5", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px" }}>
-          <p style={{ fontSize: "13px", color: navy, margin: 0, lineHeight: 1.5 }}>
+        <div style={{ background: "#EEF4FF", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px" }}>
+          <p style={{ fontSize: "13px", color: "#3B5998", margin: 0, lineHeight: 1.5 }}>
             {concernReassurance[topConcern]}
           </p>
         </div>
       )}
-
-      {/* Disclaimer */}
-      <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: "8px", padding: "10px 14px", marginBottom: "20px" }}>
-        <p style={{ fontSize: "12px", color: "#92400E", margin: 0, lineHeight: 1.5 }}>
-          ⚠️ Informational only — not medical advice. Consult a clinician before starting any protocol.
-        </p>
-      </div>
 
       {/* Peptide cards */}
       <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginBottom: "20px" }}>
@@ -387,10 +367,14 @@ function ResultsContent({ params }: { params: Record<string, string> }) {
         * Affiliate links — we earn a commission at no extra cost to you.
       </p>
 
+      {/* Bottom buttons */}
       <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-        <Link href="/quiz" style={{ display: "block", textAlign: "center", padding: "16px", border: `1px solid ${navy}`, borderRadius: "10px", fontSize: "16px", fontWeight: 700, color: navy, textDecoration: "none" }}>
+        <Link href="/quiz" style={{ display: "block", textAlign: "center", padding: "16px", background: "#FFFFFF", border: `1px solid ${navy}`, borderRadius: "10px", fontSize: "16px", fontWeight: 700, color: navy, textDecoration: "none" }}>
           ← Retake Quiz
         </Link>
+        <button style={{ display: "block", width: "100%", textAlign: "center", padding: "16px", background: "#4CAF50", border: "none", borderRadius: "10px", fontSize: "16px", fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: "inherit" }}>
+          Save My Protocol
+        </button>
         <Link href="/peptides" style={{ display: "block", textAlign: "center", padding: "16px", background: navy, borderRadius: "10px", fontSize: "16px", fontWeight: 700, color: "#fff", textDecoration: "none" }}>
           Browse All Peptides
         </Link>
