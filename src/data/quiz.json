@@ -70,7 +70,7 @@
       "question": "How do you like to receive information?",
       "subtitle": "This shapes how your results are presented.",
       "options": [
-        { "value": "minimal", "label": "Just tell me what to take and buy",   "emoji": "⚡\uFE0F" },
+        { "value": "minimal", "label": "Just tell me what to take + where to buy it",   "emoji": "⚡\uFE0F" },
         { "value": "science", "label": "Give me the science behind it",       "emoji": "🔬" },
         { "value": "social",  "label": "Show me what others have experienced","emoji": "👥" },
         { "value": "guided",  "label": "Walk me through it step by step",     "emoji": "📖" }
