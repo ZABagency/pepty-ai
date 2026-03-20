@@ -12,41 +12,95 @@ const border = "#E8E8E8";
 type Peptide = typeof peptides[0];
 type Vendor = typeof vendors[0];
 
-// Goal → ordered peptide candidates (first = highest priority)
+// ── Q1: Goal → ordered peptide candidates ────────────────────────────────────
 const goalMap: Record<string, string[]> = {
-  muscle:    ["cjc-1295", "ipamorelin", "aod-9604"],
-  energy:    ["semax", "nad-plus", "ipamorelin"],
-  recovery:  ["bpc-157", "tb-500", "ipamorelin"],
-  sleep:     ["ipamorelin", "dsip", "selank"],
-  antiaging: ["epithalon", "nad-plus", "ghk-cu"],
-  skin:      ["ghk-cu", "epithalon"],
+  muscle:    ["aod-9604", "ipamorelin", "cjc-1295"],
+  energy:    ["semax", "selank", "nad-plus"],
+  recovery:  ["bpc-157", "tb-500"],
+  sleep:     ["dsip", "ipamorelin", "selank"],
+  antiaging: ["epithalon", "ghk-cu", "nad-plus"],
+  skin:      ["ghk-cu", "bpc-157", "epithalon"],
 };
 
-// Peptides that work without injection
-const oralNasalSafe = new Set(["bpc-157", "semax", "selank", "nad-plus", "ghk-cu"]);
+// Peptides usable without SubQ injection (oral, nasal, or topical)
+const oralNasalSafe = new Set(["bpc-157", "semax", "selank", "ghk-cu", "nad-plus"]);
 
-// Social proof lines per peptide
+// ── Q2: Concern → reassurance copy ───────────────────────────────────────────
+const concernReassurance: Record<string, string> = {
+  safety:    "Every peptide in your protocol has a strong safety profile. Here's what the research shows.",
+  efficacy:  "These peptides have the strongest evidence behind them for your specific goals.",
+  sourcing:  "We only recommend vendors we'd use ourselves. Every source below is vetted.",
+  injection: "We've selected protocols with the least intimidating administration methods for your stack.",
+  cost:      "We've prioritized the best value options for your budget without compromising quality.",
+};
+
+// ── Q6: Social proof lines ────────────────────────────────────────────────────
 const socialProof: Record<string, string> = {
-  "bpc-157":   "Users report noticeable joint and gut improvements within 2–4 weeks.",
-  "tb-500":    "Popular in the fitness community for healing chronic injuries that won't quit.",
-  "ipamorelin":"Widely used for its clean GH release — deep sleep improvements reported fast.",
-  "cjc-1295":  "A staple in body recomposition stacks — often paired with Ipamorelin.",
-  "aod-9604":  "Gaining traction for stubborn fat loss, especially around the midsection.",
-  "semax":     "Strong following in nootropic communities for focus without stimulants.",
-  "selank":    "Often described as 'calm focus' — users love it for high-stress periods.",
-  "dsip":      "One of the most direct sleep peptides — typically felt on night one.",
-  "epithalon": "Used by longevity-focused biohackers — typically run 1–2 cycles per year.",
-  "ghk-cu":    "A staple in advanced skincare — clinical and community results are strong.",
-  "nad-plus":  "IV NAD+ is a transformative experience for energy — but pricey.",
+  "bpc-157":    "Used by athletes and biohackers for rapid tissue repair — noticeable joint improvements within 2–4 weeks.",
+  "tb-500":     "Popular in the fitness community for healing chronic injuries that simply won't quit.",
+  "ipamorelin": "Widely used for its clean GH release — deep sleep improvements reported within the first week.",
+  "cjc-1295":   "A staple in body recomposition stacks — often paired with Ipamorelin for amplified results.",
+  "aod-9604":   "Gaining traction for stubborn fat loss, especially around the midsection.",
+  "semax":      "Strong following in nootropic communities for sharp focus without stimulants or crashes.",
+  "selank":     "Often described as 'calm focus' — widely used during high-stress periods.",
+  "dsip":       "One of the most direct sleep peptides — effects typically felt on night one.",
+  "epithalon":  "Used by longevity-focused biohackers — typically run 1–2 cycles per year.",
+  "ghk-cu":     "A staple in advanced skincare — strong clinical and community results.",
+  "nad-plus":   "IV NAD+ is consistently described as a transformative energy experience.",
 };
 
+// Monthly cost estimates (rough midpoint for budget display)
+const monthlyEstimate: Record<string, string> = {
+  "bpc-157":    "~$45/mo",
+  "tb-500":     "~$60/mo",
+  "ipamorelin": "~$70/mo",
+  "cjc-1295":   "~$65/mo",
+  "aod-9604":   "~$55/mo",
+  "semax":      "~$40/mo",
+  "selank":     "~$35/mo",
+  "dsip":       "~$50/mo",
+  "epithalon":  "~$80/mo",
+  "ghk-cu":     "~$30/mo",
+  "nad-plus":   "~$90/mo",
+};
+
+const goalLabel: Record<string, string> = {
+  muscle: "Body Comp & Fat Loss", energy: "Energy & Focus",
+  recovery: "Recovery & Healing", sleep: "Sleep & Stress",
+  antiaging: "Anti-Aging & Longevity", skin: "Skin & Appearance",
+};
+
+// ── Vendor selection — ordered by budget tier preference ─────────────────────
+function getVendorsForPeptide(peptideId: string, budget: string, isBeginnerCard: boolean): Vendor[] {
+  const matching = vendors.filter((v) => v.peptides.includes(peptideId));
+
+  // Vendor priority by budget
+  const tierOrder =
+    budget === "low" || isBeginnerCard
+      ? ["biotech-peptides", "peptide-sciences", "limitless-life"]
+      : budget === "medium"
+      ? ["peptide-sciences", "biotech-peptides", "limitless-life"]
+      : ["limitless-life", "peptide-sciences", "biotech-peptides"]; // high / unlimited
+
+  matching.sort((a, b) => {
+    const ai = tierOrder.indexOf(a.id);
+    const bi = tierOrder.indexOf(b.id);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
+
+  // Budget / beginner: 1 vendor; otherwise up to 2
+  const limit = budget === "low" || isBeginnerCard ? 1 : 2;
+  return matching.slice(0, limit);
+}
+
+// ── Core recommendation engine ────────────────────────────────────────────────
 function getRecommendations(
   goals: string[],
   experience: string,
   injectionPref: string,
   budget: string
-): Peptide[] {
-  // Score every peptide by overlap across selected goals (position-weighted)
+): { recs: Peptide[]; injectionFallback: boolean } {
+  // Score every peptide across selected goals (position-weighted so order matters)
   const scores: Record<string, number> = {};
   for (const goal of goals) {
     const list = goalMap[goal] ?? [];
@@ -59,44 +113,53 @@ function getRecommendations(
     .sort((a, b) => b[1] - a[1])
     .map(([id]) => id);
 
-  // Injection gate — hard no means oral/nasal only
+  // Q4 — injection hard gate
+  let injectionFallback = false;
   if (injectionPref === "no") {
-    candidates = candidates.filter((id) => oralNasalSafe.has(id));
-    if (candidates.length === 0) candidates = ["semax", "nad-plus", "bpc-157"];
+    const safe = candidates.filter((id) => oralNasalSafe.has(id));
+    if (safe.length === 0) {
+      // No oral/nasal match for their goals — show best-fit with fallback note
+      injectionFallback = true;
+      candidates = candidates.slice(0, 1);
+    } else {
+      candidates = safe;
+    }
   }
 
-  // Experience gate — beginners and basic get max 2
-  const experienceMax = experience === "beginner" || experience === "basic" ? 2 : 3;
+  // Q3 — experience gate
+  const experienceMax =
+    experience === "beginner" ? 1 :
+    experience === "basic" ? 2 : 3;
 
-  // Budget gate
-  const budgetMax = budget === "low" ? 1 : budget === "medium" ? 2 : experienceMax;
+  // Q5 — budget gate
+  const budgetMax =
+    budget === "low" ? 1 :
+    budget === "medium" ? 2 : experienceMax;
 
   const limit = Math.min(experienceMax, budgetMax);
   candidates = candidates.slice(0, Math.max(limit, 1));
 
-  return candidates
+  const recs = candidates
     .map((id) => peptides.find((p) => p.id === id))
     .filter(Boolean) as Peptide[];
+
+  return { recs, injectionFallback };
 }
 
-function getVendors(peptideId: string): Vendor[] {
-  return vendors.filter((v) => v.peptides.includes(peptideId)).slice(0, 2);
-}
-
-const goalLabel: Record<string, string> = {
-  muscle: "Muscle & Fat Loss", energy: "Energy & Focus",
-  recovery: "Recovery & Healing", sleep: "Sleep & Stress",
-  antiaging: "Anti-Aging & Longevity", skin: "Skin & Appearance",
-};
-
+// ── Peptide card ──────────────────────────────────────────────────────────────
 function PeptideCard({
-  peptide, index, style,
+  peptide, index, displayStyle, isBeginnerCard, injectionPref, injectionFallback, budget, showCost,
 }: {
-  peptide: Peptide; index: number; style: string;
+  peptide: Peptide; index: number; displayStyle: string;
+  isBeginnerCard: boolean; injectionPref: string; injectionFallback: boolean;
+  budget: string; showCost: boolean;
 }) {
-  const peptideVendors = getVendors(peptide.id);
-  const showScience = style === "science";
-  const showSocial = style === "social";
+  const peptideVendors = getVendorsForPeptide(peptide.id, budget, isBeginnerCard);
+  const isMinimal = displayStyle === "minimal";
+  const showScience = displayStyle === "science";
+  const showSocial = displayStyle === "social";
+  // Only show injection reassurance when nervous AND this specific peptide requires injection
+  const showInjectionNote = injectionPref === "nervous" && peptide.method === "injection";
 
   return (
     <div style={{
@@ -105,21 +168,56 @@ function PeptideCard({
     }}>
       {/* Header */}
       <div style={{ padding: "14px 16px 12px" }}>
-        <div style={{ fontSize: "11px", fontWeight: 600, color: muted, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: "4px" }}>
-          Recommendation #{index + 1}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+          <div style={{ fontSize: "11px", fontWeight: 600, color: muted, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>
+            Recommendation #{index + 1}
+          </div>
+          {isBeginnerCard && (
+            <span style={{
+              fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "100px",
+              background: "#F0FDF4", color: "#166534",
+              letterSpacing: "0.02em", textTransform: "uppercase" as const,
+            }}>Start here</span>
+          )}
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
           <div style={{ fontSize: "20px", fontWeight: 700, color: dark }}>{peptide.name}</div>
-          {style !== "minimal" && (
+          {!isMinimal && (
             <Link href={`/peptides/${peptide.id}`} style={{ fontSize: "12px", color: navy, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" as const }}>
               Full profile →
             </Link>
           )}
         </div>
-        <div style={{ fontSize: "14px", color: muted, marginTop: "4px" }}>{peptide.goals[0]}</div>
+        {!isMinimal && (
+          <div style={{ fontSize: "14px", color: muted, marginTop: "4px" }}>{peptide.goals[0]}</div>
+        )}
       </div>
 
-      {/* Science section — expanded when style=science */}
+      {/* Q4 injection fallback note */}
+      {injectionFallback && (
+        <>
+          <div style={{ height: "1px", background: "#F0F0F0" }} />
+          <div style={{ padding: "10px 16px", background: "#FFFBEB" }}>
+            <p style={{ fontSize: "12px", color: "#92400E", margin: 0, lineHeight: 1.5 }}>
+              This peptide works best via injection but oral options exist — ask your clinician about oral BPC-157 or nasal alternatives.
+            </p>
+          </div>
+        </>
+      )}
+
+      {/* Q4 nervous reassurance — shown per card when peptide requires injection */}
+      {showInjectionNote && (
+        <>
+          <div style={{ height: "1px", background: "#F0F0F0" }} />
+          <div style={{ padding: "10px 16px", background: "#F0F9FF" }}>
+            <p style={{ fontSize: "12px", color: "#0369A1", margin: 0, lineHeight: 1.5 }}>
+              Subcutaneous injection is similar to what diabetics do daily — most people describe it as barely noticeable.
+            </p>
+          </div>
+        </>
+      )}
+
+      {/* Q6 science: how it works */}
       {showScience && (
         <>
           <div style={{ height: "1px", background: "#F0F0F0" }} />
@@ -130,7 +228,7 @@ function PeptideCard({
         </>
       )}
 
-      {/* Social proof — shown when style=social */}
+      {/* Q6 social: community proof */}
       {showSocial && socialProof[peptide.id] && (
         <>
           <div style={{ height: "1px", background: "#F0F0F0" }} />
@@ -144,7 +242,7 @@ function PeptideCard({
       <div style={{ height: "1px", background: "#F0F0F0" }} />
 
       {/* Dosing row */}
-      <div style={{ padding: "10px 16px", display: "flex", gap: "16px" }}>
+      <div style={{ padding: "10px 16px", display: "flex", gap: "16px", flexWrap: "wrap" as const }}>
         <div>
           <div style={{ fontSize: "11px", color: muted, fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: "2px" }}>Dosing</div>
           <div style={{ fontSize: "13px", color: dark, fontFamily: "monospace" }}>{peptide.dosing.split(",")[0]}</div>
@@ -153,9 +251,16 @@ function PeptideCard({
           <div style={{ fontSize: "11px", color: muted, fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: "2px" }}>Method</div>
           <div style={{ fontSize: "13px", color: dark, textTransform: "capitalize" as const }}>{peptide.method}</div>
         </div>
+        {/* Q5 budget display: show cost estimate for low and unlimited tiers */}
+        {showCost && monthlyEstimate[peptide.id] && (
+          <div>
+            <div style={{ fontSize: "11px", color: muted, fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: "2px" }}>Est. cost</div>
+            <div style={{ fontSize: "13px", color: dark }}>{monthlyEstimate[peptide.id]}</div>
+          </div>
+        )}
       </div>
 
-      {/* Vendors */}
+      {/* Vendor row */}
       {peptideVendors.length > 0 && (
         <>
           <div style={{ height: "1px", background: "#F0F0F0" }} />
@@ -163,18 +268,16 @@ function PeptideCard({
             <div style={{ fontSize: "11px", fontWeight: 600, color: muted, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Best Sources</div>
             {peptideVendors.map((v) => (
               <div key={v.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "2px" }}>
-                    <div style={{ fontSize: "14px", fontWeight: 600, color: dark }}>{v.name}</div>
-                    {v.badge && (
-                      <span style={{
-                        fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "100px",
-                        background: v.badge === "Best Value" ? "#ECFDF5" : "#EFF6FF",
-                        color: v.badge === "Best Value" ? "#065F46" : "#1E40AF",
-                        letterSpacing: "0.02em", textTransform: "uppercase" as const,
-                      }}>{v.badge}</span>
-                    )}
-                  </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div style={{ fontSize: "14px", fontWeight: 600, color: dark }}>{v.name}</div>
+                  {v.badge && (
+                    <span style={{
+                      fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "100px",
+                      background: v.badge === "Best Value" ? "#ECFDF5" : "#EFF6FF",
+                      color: v.badge === "Best Value" ? "#065F46" : "#1E40AF",
+                      letterSpacing: "0.02em", textTransform: "uppercase" as const,
+                    }}>{v.badge}</span>
+                  )}
                 </div>
                 <a
                   href={buildAffiliateUrl(v.affiliateBase, v.utmSource, v.utmMedium, peptide.id)}
@@ -192,19 +295,17 @@ function PeptideCard({
   );
 }
 
-function GettingStarted({ peptides }: { peptides: Peptide[] }) {
+// ── Q6 guided: 3-step getting started guide ───────────────────────────────────
+function GettingStarted({ recs }: { recs: Peptide[] }) {
   return (
     <div style={{ marginTop: "24px", padding: "16px", background: "#F9F9F9", border: `1px solid ${border}`, borderRadius: "12px" }}>
       <div style={{ fontSize: "15px", fontWeight: 700, color: dark, marginBottom: "14px" }}>Getting started — step by step</div>
       {[
-        "Order your peptides from one of the vetted vendors above.",
-        "Read the full profile for each peptide before starting — dosing details matter.",
-        "Start with one peptide first. Add others after 2 weeks once you know how you respond.",
-        `Your stack: ${peptides.map(p => p.name).join(" → ")}`,
-        "Track your results weekly. Most peptides show effects within 2–4 weeks.",
-        "Consult a clinician if you have any underlying conditions.",
+        `Order ${recs.map(p => p.name).join(" + ")} from one of the vetted vendors above.`,
+        "Watch our injection tutorial before your first dose — it takes 2 minutes.",
+        "Start your protocol on day 1. Track how you feel weekly. Most effects show within 2–4 weeks.",
       ].map((step, i) => (
-        <div key={i} style={{ display: "flex", gap: "12px", marginBottom: i < 5 ? "12px" : 0 }}>
+        <div key={i} style={{ display: "flex", gap: "12px", marginBottom: i < 2 ? "12px" : 0 }}>
           <div style={{ width: "22px", height: "22px", borderRadius: "50%", border: `2px solid ${navy}`, color: navy, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, flexShrink: 0, marginTop: "1px" }}>
             {i + 1}
           </div>
@@ -215,24 +316,20 @@ function GettingStarted({ peptides }: { peptides: Peptide[] }) {
   );
 }
 
-const concernReassurance: Record<string, string> = {
-  safety:    "Every peptide in your protocol has established safety data and is used in legitimate clinical and research settings.",
-  efficacy:  "The peptides matched to you are among the most studied — backed by real published data, not marketing claims.",
-  sourcing:  "All vendors we link are independently vetted — third-party tested with COAs available. No gray market.",
-  injection: "We've prioritized protocols that work without injection where your answers allow.",
-  cost:      "We've matched your budget. These are the highest-value peptides for your goals at your price point.",
-};
-
+// ── Results page ──────────────────────────────────────────────────────────────
 function ResultsContent({ params }: { params: Record<string, string> }) {
-  const goals = (params.goals ?? "recovery").split(",").filter(Boolean);
-  const experience = params.experience ?? "basic";
+  const goals        = (params.goals    ?? "recovery").split(",").filter(Boolean);
+  const experience   = params.experience ?? "basic";
   const injectionPref = params.injection ?? "fine";
-  const budget = params.budget ?? "medium";
-  const style = params.style ?? "minimal";
-  const topConcern = (params.concern ?? "").split(",")[0];
+  const budget       = params.budget    ?? "medium";
+  const displayStyle = params.style     ?? "minimal";
+  const topConcern   = (params.concern  ?? "").split(",")[0];
 
-  const recs = getRecommendations(goals, experience, injectionPref, budget);
+  const isBeginnerCard = experience === "beginner";
+  // Show monthly cost estimate for budget-conscious (low) and premium (unlimited) tiers
+  const showCost = budget === "low" || budget === "unlimited";
 
+  const { recs, injectionFallback } = getRecommendations(goals, experience, injectionPref, budget);
   const goalSummary = goals.map((g) => goalLabel[g] ?? g).join(" · ");
 
   return (
@@ -250,7 +347,7 @@ function ResultsContent({ params }: { params: Record<string, string> }) {
         </p>
       </div>
 
-      {/* Top-concern reassurance */}
+      {/* Q2 concern reassurance banner */}
       {concernReassurance[topConcern] && (
         <div style={{ background: "#F0F4FF", border: "1px solid #D0D9F5", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px" }}>
           <p style={{ fontSize: "13px", color: navy, margin: 0, lineHeight: 1.5 }}>
@@ -269,12 +366,22 @@ function ResultsContent({ params }: { params: Record<string, string> }) {
       {/* Peptide cards */}
       <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginBottom: "20px" }}>
         {recs.map((peptide, i) => (
-          <PeptideCard key={peptide.id} peptide={peptide} index={i} style={style} />
+          <PeptideCard
+            key={peptide.id}
+            peptide={peptide}
+            index={i}
+            displayStyle={displayStyle}
+            isBeginnerCard={isBeginnerCard}
+            injectionPref={injectionPref}
+            injectionFallback={injectionFallback}
+            budget={budget}
+            showCost={showCost}
+          />
         ))}
       </div>
 
-      {/* Guided getting started section */}
-      {style === "guided" && <GettingStarted peptides={recs} />}
+      {/* Q6 guided: 3-step guide */}
+      {displayStyle === "guided" && <GettingStarted recs={recs} />}
 
       <p style={{ fontSize: "11px", color: "#AAAAAA", textAlign: "center", margin: "20px 0" }}>
         * Affiliate links — we earn a commission at no extra cost to you.
